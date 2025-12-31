@@ -12,13 +12,36 @@ uintptr_t Paradise::Finder::FindPushWidget()
     return p;
 }
 
+uintptr_t MatchmakingPatchOffset = 0;
+uintptr_t FindMatchmakingPatch()
+{
+    auto wtfisthis = Memcury::Scanner::FindPattern("48 89 5C 24 ?? 48 89 54 24 ?? 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 4D 8B F8").Get();
+
+    if (!wtfisthis)
+    {
+        return 0;
+    }
+    uint8_t* bytes = reinterpret_cast<uint8_t*>(wtfisthis);
+
+    for (int i = 0; i < 300; i++)
+    {
+        if (bytes[i] == 0xE8 && bytes[i + 5] == 0x84 && bytes[i + 6] == 0xC0 && (bytes[i + 7] == 0x74 || bytes[i + 7] == 0x0F))
+        {
+            int32_t offset = *reinterpret_cast<int32_t*>(bytes + i + 1);
+            uintptr_t target = wtfisthis + i + 5 + offset;
+            return target;
+        }
+    }
+    return 0;
+}
+
 void Paradise::Finder::InitializeExitHook()
 {
     static bool bInitSet = false;
-	if (bInitSet)
-		return;
-	bInitSet = true;
-    
+    if (bInitSet)
+        return;
+    bInitSet = true;
+
     auto UnsafeEnvironmentPopup = Memcury::Scanner::FindPattern("4C 8B DC 55 49 8D AB ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 49 89 73 F0 49 89 7B E8 48 8B F9 4D 89 63 E0 4D 8B E0 4D 89 6B D8").Get();
 
     if (!UnsafeEnvironmentPopup)
@@ -37,12 +60,12 @@ void Paradise::Finder::InitializeExitHook()
     {
         UnsafeEnvironmentPopup = Memcury::Scanner::FindPattern("48 89 5C 24 ? 55 56 57 41 54 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 80 B9 ? ? ? ? ? 48 8B DA 48 8B F1").Get(); // patch6 - 30.00
     }
-    
+
     if (!UnsafeEnvironmentPopup)
     {
         Log("Failed to find UnsafeEnvironmentPopupAddr");
     }
-    
+
     auto RequestExitWithStatus = Memcury::Scanner::FindPattern("48 89 5C 24 ? 57 48 83 EC 40 41 B9 ? ? ? ? 0F B6 F9 44 38 0D ? ? ? ? 0F B6 DA 72 24 89 5C 24 30 48 8D 05 ? ? ? ? 89 7C 24 28 4C 8D 05 ? ? ? ? 33 D2 48 89 44 24 ? 33 C9 E8 ? ? ? ?").Get();
     if (!RequestExitWithStatus)
     {
@@ -54,7 +77,7 @@ void Paradise::Finder::InitializeExitHook()
     {
         Log("Failed to find RequestExitWithStatusAddr");
     }
-    
+
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
     DetourAttach(reinterpret_cast<void**>(&UnsafeEnvironmentPopup), Paradise::UnsafeEnvironmentPopup);
@@ -64,4 +87,14 @@ void Paradise::Finder::InitializeExitHook()
     DetourUpdateThread(GetCurrentThread());
     DetourAttach(reinterpret_cast<void**>(&RequestExitWithStatus), Paradise::RequestExitWithStatus);
     DetourTransactionCommit();
+
+    MatchmakingPatchOffset = FindMatchmakingPatch();
+
+    if (MatchmakingPatchOffset) 
+    {
+        DetourTransactionBegin();
+        DetourUpdateThread(GetCurrentThread());
+        DetourAttach(reinterpret_cast<void**>(&MatchmakingPatchOffset), Paradise::MatchmakingPatch);
+        DetourTransactionCommit();
+    }
 }

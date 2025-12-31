@@ -12,6 +12,7 @@ namespace Paradise {
     inline void RequestExitWithStatus(bool Force, unsigned char Code) {}
 
     inline void UnsafeEnvironmentPopup(wchar_t** unknown1, unsigned __int8* case_, __int64* unknown2, char unknown3) {};
+    inline bool __fastcall MatchmakingPatch(__int64 a1) { return false; }
 
     namespace Strings {
         constexpr auto ProcessRequest = L"Could not set libcurl options for easy handle, processing HTTP request failed. Increase verbosity for additional information.";
